@@ -17,22 +17,16 @@
 // @run-at       document-start
 // ==/UserScript==
 
-// 临时引入 JSZip 库，方便打包下载验证码数据
-
 (function () {
     'use strict';
 
     // --- 全局配置 ---
 
     const STATE = {
-        courses: [], // 意向课程列表 { lessonAssoc: number, status: 'pending' | 'success' }
         studentId: '',
         turnId: '',
         headers: {}, // 从原始请求中捕获的全局 HTTP 头
         isGrabbing: false,
-        skipCaptcha: false, // 是否跳过验证码
-        isImporting: false,
-        concurrency: 2, // 每门课并发实例数量
         isCaptchaLoopRunning: false,
 
         // 统计 RPS
@@ -45,7 +39,6 @@
     // --- UI 模块 ---
     const UI = {
         panel: null,
-        courseListEl: null,
         createPanel() {
             if (document.getElementById('grabber-panel')) return;
             const panel = document.createElement('div');
@@ -83,7 +76,6 @@
             `;
             document.body.appendChild(panel);
             this.panel = panel;
-            this.courseListEl = document.getElementById('course-list');
             this.applyStyles();
             this.makeDraggable(panel, panel.querySelector('.grabber-header'));
             this.addEventListeners();
@@ -143,95 +135,24 @@
         },
         render() {
             document.getElementById('student-id-input').value = STATE.studentId;
-            document.getElementById('skip-captcha-checkbox').checked = STATE.skipCaptcha;
-            document.getElementById('concurrency-slider').value = STATE.concurrency;
-            document.getElementById('concurrency-value').textContent = STATE.concurrency;
             document.getElementById('rps-value').textContent = STATE.rps;
 
-            this.courseListEl.innerHTML = '';
-            STATE.courses.forEach((course, index) => {
-                const li = document.createElement('li');
-                const statusClass = course.status === 'success' ? 'status-success' : 'status-pending';
-                const statusText = course.status === 'success' ? '成功' : (STATE.isGrabbing ? '抢课中...' : '待抢');
-                li.innerHTML = `
-                    <span class="course-id">LessonAssoc: ${course.lessonAssoc}</span>
-                    <span class="course-status ${statusClass}">${statusText}</span>
-                    <div class="course-actions">
-                        <button data-index="${index}" data-action="delete" title="删除">❌</button>
-                    </div>
-                `;
-                this.courseListEl.appendChild(li);
-            });
-
             const grabBtn = document.getElementById('grab-btn');
-            const importBtn = document.getElementById('import-btn');
             const resetBtn = document.getElementById('reset-btn');
-            const clearBtn = document.getElementById('clear-btn');
 
             if (STATE.isGrabbing) {
                 grabBtn.textContent = '停止抢课';
                 grabBtn.classList.add('grabbing');
-                importBtn.disabled = true;
                 resetBtn.disabled = true;
-                clearBtn.disabled = true;
             } else {
                 grabBtn.textContent = '开始抢课';
                 grabBtn.classList.remove('grabbing');
-                importBtn.disabled = false;
                 resetBtn.disabled = false;
-                clearBtn.disabled = false;
             }
-
-            importBtn.textContent = STATE.isImporting ? '正在导入...' : '导入页面';
-            importBtn.disabled = STATE.isImporting || STATE.isGrabbing;
         },
         addEventListeners() {
-            this.courseListEl.addEventListener('click', (e) => {
-                if (STATE.isGrabbing) {
-                    alert('请先停止抢课再操作列表！');
-                    return;
-                }
-                const target = e.target.closest('button');
-                if (!target) return;
-                const index = parseInt(target.dataset.index, 10);
-                const action = target.dataset.action;
-                if (action === 'delete') {
-                    STATE.courses.splice(index, 1);
-                    Persistence.save();
-                    this.render();
-                }
-            });
             document.getElementById('grab-btn').addEventListener('click', () => {
                 STATE.isGrabbing ? ExecutionEngine.stop() : ExecutionEngine.start();
-            });
-            document.getElementById('skip-captcha-checkbox').addEventListener('change', (e) => {
-                STATE.skipCaptcha = e.target.checked;
-                Persistence.save();
-                // 当skipCaptcha变化时，需启动或停止验证码循环
-                if (STATE.isGrabbing) {
-                    if (STATE.skipCaptcha) {
-                        ExecutionEngine.stopCaptchaLoop();
-                    } else {
-                        ExecutionEngine.startCaptchaLoop();
-                    }
-                }
-            });
-
-            document.getElementById('concurrency-slider').addEventListener('input', (e) => {
-                STATE.concurrency = parseInt(e.target.value, 10);
-                document.getElementById('concurrency-value').textContent = STATE.concurrency;
-                Persistence.save();
-            });
-            document.getElementById('clear-btn').addEventListener('click', () => {
-                if (STATE.isGrabbing) {
-                    alert('请先停止抢课！');
-                    return;
-                }
-                if (confirm('确定要清空所有意向课程吗？')) {
-                    STATE.courses = [];
-                    Persistence.save();
-                    this.render();
-                }
             });
             document.getElementById('reset-btn').addEventListener('click', () => {
                 if (STATE.isGrabbing) {
@@ -242,46 +163,9 @@
                 STATE.turnId = '';
                 STATE.headers = {};
                 STATE.isCaptchaLoopRunning = false;
-                Persistence.save();
                 this.render();
                 console.log('[抢课助手] 上下文信息已重置 ');
             });
-            document.getElementById('import-btn').addEventListener('click', () => {
-                if (STATE.isGrabbing) {
-                    alert('请先停止抢课！');
-                    return;
-                }
-                STATE.isImporting = true;
-                this.render();
-                alert('导入模式已开启！请在选课页面进行一次翻页或筛选操作，脚本即自动捕获当前页所有课程 ');
-            });
-        }
-    };
-
-    // --- 数据持久化 ---
-    const Persistence = {
-        save() {
-            const dataToSave = {
-                courses: STATE.courses,
-                studentId: STATE.studentId,
-                turnId: STATE.turnId,
-                headers: STATE.headers,
-                skipCaptcha: STATE.skipCaptcha,
-                concurrency: STATE.concurrency,
-            };
-            GM_setValue('grabber_state', JSON.stringify(dataToSave));
-        },
-        load() {
-            const savedState = GM_getValue('grabber_state');
-            if (savedState) {
-                const parsed = JSON.parse(savedState);
-                STATE.courses = parsed.courses || [];
-                STATE.studentId = parsed.studentId || '';
-                STATE.turnId = parsed.turnId || '';
-                STATE.headers = parsed.headers || {};
-                STATE.skipCaptcha = parsed.skipCaptcha || false;
-                STATE.concurrency = parsed.concurrency || 5;
-            }
         }
     };
 
@@ -308,34 +192,12 @@
                         }
                         STATE.studentId = studentAssoc.toString();
                         STATE.turnId = turnId.toString();
-                        if (!STATE.courses.some(c => c.lessonAssoc === lessonAssoc)) {
-                            STATE.courses.push({lessonAssoc, status: 'pending'});
-                        }
-                        Persistence.save();
                         UI.render();
                     } catch (e) {
                         console.error('[抢课助手] 解析请求 payload 失败:', e);
                     }
                 }
                 // 捕获页面课程列表加载操作（仅在导入模式下）
-                else if (STATE.isImporting && url.pathname.includes('/api/v1/student/course-select/std-count')) {
-                    const lessonIdsParam = url.searchParams.get('lessonIds');
-                    if (lessonIdsParam) {
-                        const lessonIds = lessonIdsParam.split(',');
-                        let newCoursesCount = 0;
-                        lessonIds.forEach(idStr => {
-                            const lessonAssoc = parseInt(idStr, 10);
-                            if (!isNaN(lessonAssoc) && !STATE.courses.some(c => c.lessonAssoc === lessonAssoc)) {
-                                STATE.courses.push({lessonAssoc, status: 'pending'});
-                                newCoursesCount++;
-                            }
-                        });
-                        console.log(`[抢课助手] 导入 ${newCoursesCount} 门新课程 `);
-                        STATE.isImporting = false; // 导入一次后自动关闭
-                        Persistence.save();
-                        UI.render();
-                    }
-                }
                 return originalSend.apply(this, arguments);
             };
             const originalOpen = XMLHttpRequest.prototype.open;
@@ -469,9 +331,7 @@
             UI.render();
             console.log('%c[抢课助手] 开始抢课...', 'color: green;');
 
-            if (!STATE.skipCaptcha) {
-                this.startCaptchaLoop();
-            }
+            this.startCaptchaLoop();
 
             STATE.reqTimestamps = [];
             STATE.rpsIntervalId = setInterval(this.calculateRPS.bind(this), 1000); // 每1000ms更新一次RPS
@@ -599,13 +459,6 @@
             URL.revokeObjectURL(link.href);
         },
 
-// 使用示例：
-// const myMap = new Map([
-//     ['folder1', ['content1', 'content2']],
-//     ['folder2', ['content3', 'content4']]
-// ]);
-// downloadMap(myMap, 'myData.zip');
-
         async stopCaptchaLoop() {
             STATE.isCaptchaLoopRunning = false;
             console.log('[抢课助手] 验证码循环已停止');
@@ -638,7 +491,6 @@
 
     function init() {
         console.log('[抢课助手] 脚本已启动 ');
-        Persistence.load();
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
                 UI.createPanel();
