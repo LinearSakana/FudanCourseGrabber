@@ -20,7 +20,7 @@
     'use strict';
 
     // --- 全局配置 ---
-    
+
     const STATE = {
         courses: [], // 意向课程列表 { lessonAssoc: number, status: 'pending' | 'success' }
         studentId: '',
@@ -31,11 +31,11 @@
         isImporting: false,
         concurrency: 2, // 每门课并发实例数量
         activeWorkers: new Map(), // 存储活跃的 Worker 实例，键为唯一 ID ，值为 Worker 对象
-        isCaptchaLoopRunning: false, 
+        isCaptchaLoopRunning: false,
 
         // 统计 RPS
         reqTimestamps: [], // 存储每个请求完成的时间戳
-        rps: 0, 
+        rps: 0,
         rpsIntervalId: null, // setInterval 的 ID
     };
 
@@ -734,7 +734,7 @@
             UI.render();
         }
     };
-    
+
     function init() {
         console.log('[抢课助手] 脚本已启动 ');
         Persistence.load();
