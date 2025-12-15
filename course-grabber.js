@@ -123,7 +123,6 @@
                         const addDropParsed = JSON.parse(addDropRes.responseText);
 
                         if (addDropParsed.data && addDropParsed.data.success) {
-                            log('抢课成功 !!! 任务完成，Worker即将终止 ');
                             postMessage({ type: 'success', lessonAssoc: lessonAssoc });
                             self.close();
                             return; // 退出循环
@@ -262,7 +261,7 @@
             document.getElementById('skip-captcha-checkbox').checked = STATE.skipCaptcha;
             document.getElementById('concurrency-slider').value = STATE.concurrency;
             document.getElementById('concurrency-value').textContent = STATE.concurrency;
-            document.getElementById('rps-value').textContent = STATE.rps; // 更新 RPS 值
+            document.getElementById('rps-value').textContent = STATE.rps;
 
             this.courseListEl.innerHTML = '';
             STATE.courses.forEach((course, index) => {
@@ -288,11 +287,13 @@
                 grabBtn.textContent = '停止抢课';
                 grabBtn.classList.add('grabbing');
                 importBtn.disabled = true;
+                resetBtn.disabled = true;
                 clearBtn.disabled = true;
             } else {
                 grabBtn.textContent = '开始抢课';
                 grabBtn.classList.remove('grabbing');
                 importBtn.disabled = false;
+                resetBtn.disabled = false;
                 clearBtn.disabled = false;
             }
 
@@ -413,7 +414,7 @@
                         const lessonAssoc = payload.requestMiddleDtos[0].lessonAssoc;
                         const studentAssoc = payload.studentAssoc;
                         const turnId = payload.courseSelectTurnAssoc;
-                        console.log(`[抢课助手] 捕获到课程请求: lessonAssoc=${lessonAssoc}`);
+                        console.log(`[抢课助手] 捕获到 Lesson ${lessonAssoc}`);
                         if (Object.keys(STATE.headers).length === 0) {
                             STATE.headers = {...this._headers};
                             delete STATE.headers['Host'];
@@ -545,13 +546,12 @@
             // 重置课程状态
             STATE.courses.forEach(c => c.status = 'pending');
             UI.render();
-            console.log('[抢课助手] 开始抢课...');
+            console.log('%c[抢课助手] 开始抢课...', 'color: green;');
 
             if (!STATE.skipCaptcha) {
                 this.startCaptchaLoop();
             }
 
-            // RPS 计数启动
             STATE.reqTimestamps = [];
             STATE.rpsIntervalId = setInterval(this.calculateRPS.bind(this), 1000); // 每1000ms更新一次RPS
 
@@ -563,7 +563,7 @@
                     const workerId = `${course.lessonAssoc}-${i}`;
                     const worker = new Worker(workerUrl);
                     worker.onmessage = (event) => {
-                        const {type, requestId, details, response, error, message, payload} = event.data;
+                        const {type, requestId, details, message} = event.data;
                         if (type === 'gm_request') {
                             GM_xmlhttpRequest({
                                 ...details,
@@ -657,7 +657,7 @@
 
                     const cdnResponse = await this.makeRequest('GET', cdnUrl, cdnHeaders);
                     const imgParsed = JSON.parse(JSON.parse(cdnResponse.responseText).data);
-                    
+
                     const moveEndX = await CaptchaSolver.calculate(imgParsed.SrcImage, imgParsed.CutImage);
                     console.log(`[验证码 Loop] 滑块距离: ${moveEndX}`);
 
@@ -701,7 +701,7 @@
                 });
             });
         },
-        
+
         stopCaptchaLoop() {
             STATE.isCaptchaLoopRunning = false;
             console.log('[抢课助手] 验证码循环已停止');
@@ -714,7 +714,7 @@
             });
             STATE.activeWorkers.clear();
             STATE.isGrabbing = false;
-            
+
             this.stopCaptchaLoop();
 
             // RPS 计数停止
@@ -724,7 +724,7 @@
             STATE.rps = 0;
 
             UI.render();
-            console.log('[抢课助手] 所有任务已停止 ');
+            console.log('%c[抢课助手] 所有任务已停止', 'color: red;');
         },
 
         calculateRPS() {
