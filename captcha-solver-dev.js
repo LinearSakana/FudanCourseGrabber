@@ -21,7 +21,6 @@
     'use strict';
 
     // --- 全局配置 ---
-
     const STATE = {
         studentId: '',
         turnId: '',
@@ -34,7 +33,15 @@
         rps: 0,
         rpsIntervalId: null, // setInterval 的 ID
     };
-
+    // 验证码的 imgIndex 只有下面六种可能
+    const LIST_OF_IMGINDEX = [
+        "3ab5eec0-fbb6-4c3f-bfcc-0ce693077db3",
+        "393c5000-304d-4d2d-9ce1-3db6345e0a6b",
+        "3437e4cb-a995-4fae-aeea-14174abc0d6a",
+        "60176ec4-7482-4763-876a-431eceefe779",
+        "c6e7c8e9-b681-4dc2-8d61-e45588f8c7fa",
+        "c9f5d967-9c4b-43fe-b2eb-dc0a2ef01ed7"
+    ];
 
     // --- UI 模块 ---
     const UI = {
@@ -290,11 +297,12 @@
             }
             if (!this.imgIndexMap.get(key1).has(key2)) {
                 this.imgIndexMap.get(key1).set(key2, value);
+                console.info(`%c Add new value:${key2}`, 'color: #0288D1');
             }
         },
-        jsZipLoaded: null,
+        // 使用 JSZip 支持将捕获的数据打包下载
         initJSZip() {
-            this.jsZipLoaded = new Promise((resolve, reject) => {
+            return new Promise((resolve, reject) => {
                 if (typeof JSZip !== 'undefined') return resolve();
                 console.log('[抢课助手] 正在加载 JSZip...');
                 GM_xmlhttpRequest({
@@ -318,7 +326,62 @@
                     }
                 });
             });
-            return this.jsZipLoaded;
+        },
+        // 加载已有的 captchaRecords
+        loadCaptchaRecords() {
+            return new Promise((resolve, reject) => {
+                try {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.multiple = true;
+                    input.style.display = 'none';
+                    document.body.appendChild(input);
+
+                    input.addEventListener('change', async (event) => {
+                        try {
+                            const files = Array.from(event.target.files);
+                            if (LIST_OF_IMGINDEX.filter(imgIndex => {
+                                return !files.some(f => f.name.includes(imgIndex));
+                            }).length > 0) {
+                                throw new Error(`缺失必需文件, 已选择: ${files.map(f => f.name).join(', ')}`);
+                            }
+                            // 并行加载
+                            const results = await Promise.all(
+                                files.map(async file => {
+                                    try {
+                                        const text = await new Promise((res, rej) => {
+                                            const reader = new FileReader();
+                                            reader.onload = () => res(reader.result);
+                                            reader.onerror = () => rej(new Error(`读取失败: ${file.name}`));
+                                            reader.readAsText(file);
+                                        });
+                                        // 解析JSON
+                                        const valueMap = new Map(Object.entries(JSON.parse(text)));
+                                        return {imgIndex: file.name.replace(".json", ""), valueMap};
+                                    } catch (err) {
+                                        throw new Error(`解析失败 [${file.name}]: ${err.message}`);
+                                    }
+                                })
+                            );
+                            results.forEach(result => {
+                                this.imgIndexMap.set(result.imgIndex, result.valueMap);
+                                console.log(`✅ 已加载: ${result.imgIndex} (${result.valueMap.size} 项)`);
+                            });
+
+                            console.log('所有配置文件加载完成!');
+                            resolve();
+                        } catch (err) {
+                            reject(new Error(`初始化失败 - ${err.message}`));
+                        } finally {
+                            // 清理DOM元素
+                            input.remove();
+                        }
+                    });
+                    input.click();
+                } catch (err) {
+                    reject(new Error(`初始化失败 - ${err.message}`));
+                }
+            });
         },
         async start() {
             if (!STATE.studentId || !STATE.turnId || Object.keys(STATE.headers).length === 0) {
@@ -359,6 +422,15 @@
                 return;
             }
 
+            try {
+                await this.loadCaptchaRecords();
+            } catch (error) {
+                console.error('[抢课助手] 本地 captchaRecords 加载失败，验证码循环无法启动');
+                console.error(error);
+                STATE.isCaptchaLoopRunning = false;
+                return;
+            }
+
             // 启动验证码 Loop
             const captchaLoop = async () => {
                 if (!STATE.isCaptchaLoopRunning) return;
@@ -376,20 +448,26 @@
                     const {imgIndex, posIndex} = randomImgParsed.data;
                     console.log(`[验证码 Loop] 获取到验证码参数: imgIndex=${imgIndex}, posIndex=${posIndex}`);
 
-                    // 跨域获取验证码图片
-                    const cdnUrl = `https://cdn-fudan.demo.supwisdom.com/verify/static/verify-image/${imgIndex}/${posIndex}/verify-image.json`;
-                    const cdnHeaders = {
-                        ...STATE.headers,
-                        'Host': 'cdn-fudan.demo.supwisdom.com',
-                        'Origin': 'https://xk.fudan.edu.cn',
-                        'Referer': 'https://xk.fudan.edu.cn/',
-                        'Sec-Fetch-Site': 'cross-site'
-                    };
+                    let moveEndX;
+                    if (this.imgIndexMap.get(imgIndex).has(posIndex)) {
+                        console.log(`%c 使用了查找表中数据: ${this.imgIndexMap.get(imgIndex).get(posIndex)}`, 'color: green');
+                        moveEndX = this.imgIndexMap.get(imgIndex).get(posIndex);
+                    } else {
+                        // 跨域获取验证码图片
+                        const cdnUrl = `https://cdn-fudan.demo.supwisdom.com/verify/static/verify-image/${imgIndex}/${posIndex}/verify-image.json`;
+                        const cdnHeaders = {
+                            ...STATE.headers,
+                            'Host': 'cdn-fudan.demo.supwisdom.com',
+                            'Origin': 'https://xk.fudan.edu.cn',
+                            'Referer': 'https://xk.fudan.edu.cn/',
+                            'Sec-Fetch-Site': 'cross-site'
+                        };
 
-                    const cdnResponse = await this.makeRequest('GET', cdnUrl, cdnHeaders);
-                    const imgParsed = JSON.parse(JSON.parse(cdnResponse.responseText).data);
+                        const cdnResponse = await this.makeRequest('GET', cdnUrl, cdnHeaders);
+                        const imgParsed = JSON.parse(JSON.parse(cdnResponse.responseText).data);
 
-                    const moveEndX = await CaptchaSolver.calculate(imgParsed.SrcImage, imgParsed.CutImage);
+                        moveEndX = await CaptchaSolver.calculate(imgParsed.SrcImage, imgParsed.CutImage);
+                    }
                     console.log(`[验证码 Loop] 滑块距离: ${moveEndX}`);
 
                     const rstImgUrl = `/api/v1/student/course-select/rstImgSwipe?moveEndX=${moveEndX}&wbili=1&studentId=${STATE.studentId}&turnId=${STATE.turnId}`;
