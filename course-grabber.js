@@ -616,6 +616,16 @@
             console.log('%c[抢课助手] 开始抢课...', 'color: green;');
 
             if (!STATE.skipCaptcha) {
+                // 加载本地查找表
+                if (STATE.useLocalLUT && !this.captchaMap.size) {
+                    try {
+                        await this.loadCaptchaRecords();
+                    } catch (error) {
+                        console.error('[抢课助手] 本地 captchaRecords 加载失败，验证码循环无法启动');
+                        STATE.isCaptchaLoopRunning = false;
+                        return;
+                    }
+                }
                 this.startCaptchaLoop();
             }
 
