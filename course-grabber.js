@@ -314,8 +314,7 @@
                 const target = e.target.closest('button');
                 if (!target) return;
                 const index = parseInt(target.dataset.index, 10);
-                const action = target.dataset.action;
-                if (action === 'delete') {
+                if (target.dataset.action === 'delete') {
                     STATE.courses.splice(index, 1);
                     Persistence.save();
                     this.render();
@@ -635,13 +634,12 @@
             if (ENABLE_RPS_CALCULATING) {
                 STATE.rpsIntervalId = setInterval(this.calculateRPS.bind(this), 1000); // 每1000ms更新一次RPS
             }
-            const workerBlob = new Blob([workerCode], {type: 'application/javascript'});
-            const workerUrl = URL.createObjectURL(workerBlob);
 
             for (const course of STATE.courses) {
                 for (let i = 0; i < STATE.concurrency; i++) { // 使用状态中的并发数
                     const workerId = `${course.lessonAssoc}-${i}`;
-                    const worker = new Worker(workerUrl);
+                    const worker =
+                        new Worker(URL.createObjectURL(new Blob([workerCode], {type: 'application/javascript'})));
                     worker.onmessage = (event) => {
                         const {type, requestId, details, message} = event.data;
                         if (type === 'gm_request') {
