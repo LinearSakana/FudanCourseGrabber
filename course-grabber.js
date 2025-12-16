@@ -533,6 +533,64 @@
 
     // --- 抢课执行引擎 ---
     const ExecutionEngine = {
+        captchaMap: new Map(),
+        // 加载已有的 captchaRecords
+        loadCaptchaRecords() {
+            return new Promise((resolve, reject) => {
+                try {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.multiple = true;
+                    input.style.display = 'none';
+                    document.body.appendChild(input);
+
+                    input.addEventListener('change', async (event) => {
+                        try {
+                            const files = Array.from(event.target.files);
+                            if (LIST_OF_IMGINDEX.filter(imgIndex => {
+                                return !files.some(f => f.name.includes(imgIndex));
+                            }).length > 0) {
+                                throw new Error(`缺失必需文件, 已选择: ${files.map(f => f.name).join(', ')}`);
+                            }
+                            // 并行加载
+                            const results = await Promise.all(
+                                files.map(async file => {
+                                    try {
+                                        const text = await new Promise((res, rej) => {
+                                            const reader = new FileReader();
+                                            reader.onload = () => res(reader.result);
+                                            reader.onerror = () => rej(new Error(`读取失败: ${file.name}`));
+                                            reader.readAsText(file);
+                                        });
+                                        // 解析JSON
+                                        const valueMap = new Map(Object.entries(JSON.parse(text)));
+                                        return {imgIndex: file.name.replace(".json", ""), valueMap};
+                                    } catch (err) {
+                                        throw new Error(`解析失败 [${file.name}]: ${err.message}`);
+                                    }
+                                })
+                            );
+                            results.forEach(result => {
+                                this.captchaMap.set(result.imgIndex, result.valueMap);
+                                console.log(`✅ 已加载: ${result.imgIndex} (${result.valueMap.size} 项)`);
+                            });
+
+                            console.log('所有配置文件加载完成!');
+                            resolve();
+                        } catch (err) {
+                            reject(new Error(`初始化失败 - ${err.message}`));
+                        } finally {
+                            // 清理DOM元素
+                            input.remove();
+                        }
+                    });
+                    alert("接下来请选中全部的的 6 个 imgIndex.json 文件");
+                    input.click();
+                } catch (err) {
+                    reject(new Error(`初始化失败 - ${err.message}`));
+                }
+            });
+        },
         async start() {
             if (!STATE.studentId || !STATE.turnId || Object.keys(STATE.headers).length === 0) {
                 alert('上下文信息不完整，请先在网页上进行一次手动选课操作以自动捕获 ');
