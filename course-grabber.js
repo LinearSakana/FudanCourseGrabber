@@ -685,7 +685,9 @@
                             headers: STATE.headers
                         }
                     });
-                    STATE.activeWorkers.set(workerId, worker);
+                    setTimeout(() => {
+                        STATE.activeWorkers.set(workerId, worker);
+                    }, 1000 / STATE.concurrency);
                 }
             }
         },
