@@ -587,7 +587,7 @@
                             console.log('所有配置文件加载完成!');
                             resolve();
                         } catch (err) {
-                            reject(new Error(`初始化失败 - ${err.message}`));
+                            reject(new Error(`初始化失败, 请刷新重试 - ${err.message}`));
                         } finally {
                             // 清理DOM元素
                             input.remove();
@@ -596,7 +596,7 @@
                     alert("接下来请选中全部的 6 个 imgIndex.json 文件");
                     input.click();
                 } catch (err) {
-                    reject(new Error(`初始化失败 - ${err.message}`));
+                    reject(new Error(`初始化失败, 请刷新重试 - ${err.message}`));
                 }
             });
         },
@@ -621,6 +621,7 @@
                     try {
                         await this.loadCaptchaRecords();
                     } catch (error) {
+                        alert(error.message);
                         console.error('[抢课助手] 本地 captchaRecords 加载失败，验证码循环无法启动');
                         STATE.isCaptchaLoopRunning = false;
                         return;
