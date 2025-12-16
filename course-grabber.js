@@ -20,6 +20,7 @@
     'use strict';
 
     // --- 全局配置 ---
+    const ENABLE_RPS_CALCULATING = true;  // 手动设置，决定是否统计 RPS，
     const NEGLECT_CAPTCHA_VERIFICATION_RESPONSE = true;  // 手动设置，决定验证码循环时是否 await 响应结果
     const STATE = {
         courses: [], // 意向课程列表 { lessonAssoc: number, status: 'pending' | 'success' }
@@ -265,7 +266,7 @@
             document.getElementById('use-local-lut-checkbox').checked = STATE.useLocalLUT;
             document.getElementById('concurrency-slider').value = STATE.concurrency;
             document.getElementById('concurrency-value').textContent = STATE.concurrency;
-            document.getElementById('rps-value').textContent = STATE.rps;
+            document.getElementById('rps-value').textContent = ENABLE_RPS_CALCULATING ? STATE.rps : '未统计';
 
             this.courseListEl.innerHTML = '';
             STATE.courses.forEach((course, index) => {
@@ -631,8 +632,9 @@
             }
 
             STATE.reqTimestamps = [];
-            STATE.rpsIntervalId = setInterval(this.calculateRPS.bind(this), 1000); // 每1000ms更新一次RPS
-
+            if (ENABLE_RPS_CALCULATING) {
+                STATE.rpsIntervalId = setInterval(this.calculateRPS.bind(this), 1000); // 每1000ms更新一次RPS
+            }
             const workerBlob = new Blob([workerCode], {type: 'application/javascript'});
             const workerUrl = URL.createObjectURL(workerBlob);
 
@@ -651,11 +653,11 @@
                                         requestId,
                                         response: {responseText: res.responseText, status: res.status}
                                     });
-                                    STATE.reqTimestamps.push(Date.now()); // 记录请求完成时间，便于计算 RPS
+                                    if (ENABLE_RPS_CALCULATING) STATE.reqTimestamps.push(Date.now()); // 记录请求完成时间，便于计算 RPS
                                 },
                                 onerror: (err) => {
                                     worker.postMessage({type: 'request_response', requestId, error: err.toString()});
-                                    STATE.reqTimestamps.push(Date.now());
+                                    if (ENABLE_RPS_CALCULATING) STATE.reqTimestamps.push(Date.now());
                                 }
                             });
                         } else if (type === 'log') {
@@ -780,12 +782,16 @@
                     method,
                     url,
                     headers,
-                    onload: (res) => {
+                    onload: ENABLE_RPS_CALCULATING ? (res) => {
                         STATE.reqTimestamps.push(Date.now());
                         resolve(res);
+                    } : (res) => {
+                        resolve(res);
                     },
-                    onerror: (err) => {
+                    onerror: ENABLE_RPS_CALCULATING ? (err) => {
                         STATE.reqTimestamps.push(Date.now());
+                        reject(err);
+                    } : (err) => {
                         reject(err);
                     }
                 });
@@ -808,10 +814,12 @@
             this.stopCaptchaLoop();
 
             // RPS 计数停止
-            clearInterval(STATE.rpsIntervalId);
-            STATE.rpsIntervalId = null;
-            STATE.reqTimestamps = [];
-            STATE.rps = 0;
+            if (ENABLE_RPS_CALCULATING) {
+                clearInterval(STATE.rpsIntervalId);
+                STATE.rpsIntervalId = null;
+                STATE.reqTimestamps = [];
+                STATE.rps = 0;
+            }
 
             UI.render();
             console.log('%c[抢课助手] 所有任务已停止', 'color: red;');
