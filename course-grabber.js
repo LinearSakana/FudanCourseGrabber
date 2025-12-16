@@ -687,7 +687,7 @@
                     });
                     setTimeout(() => {
                         STATE.activeWorkers.set(workerId, worker);
-                    }, 1000 / STATE.concurrency);
+                    }, 1000 / STATE.concurrency);  // 避免 Worker 集中启动
                 }
             }
         },
