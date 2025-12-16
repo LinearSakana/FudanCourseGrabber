@@ -181,12 +181,11 @@
                         <label for="use-local-lut-checkbox">导入本地 Captcha</br>查找表（.json）</label>
                     </div>
                     <div class="grabber-slider-group">
-                        <label for="concurrency-slider">并发数:</label>
+                        <label for="concurrency-slider" id="concurrency-num">并发数:</label>
                         <input type="range" id="concurrency-slider" min="1" max="10" value="5">
-                        <span id="concurrency-value">5</span>
-                    </div>
-                    <div class="grabber-info-group">
-                        <span>RPS: <span id="rps-value">0</span></span>
+                        <span id="concurrency-value">5</span>                       
+                        <span>RPS:</span>
+                        <span id="rps-value">0</span>                        
                     </div>
                     <h3>意向课程列表</h3>
                     <ul id="course-list"></ul>
@@ -212,8 +211,9 @@
                 #grabber-panel { position: fixed; top: 100px; right: 20px; width: 300px; background: #f9f9f9; border: 1px solid #ccc; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); z-index: 9999; font-family: sans-serif; font-size: 14px; }
                 .grabber-header { padding: 10px; background: #4a90e2; color: white; font-weight: bold; cursor: move; border-top-left-radius: 8px; border-top-right-radius: 8px; }
                 .grabber-body { padding: 15px; }
-                .grabber-input-group, .grabber-slider-group, .grabber-info-group { margin-bottom: 15px; display: flex; align-items: center; }
+                .grabber-input-group, .grabber-slider-group { margin-bottom: 15px; display: flex; align-items: center; }
                 .grabber-input-group label, .grabber-slider-group label { margin-right: 10px; cursor: pointer; }
+                #concurrency-num { margin-right: 6px; }
                 #student-id-input { flex-grow: 1; padding: 5px; border: 1px solid #ccc; border-radius: 4px; background: #eee; }
                 #concurrency-slider { flex-grow: 1; }
                 #concurrency-value { min-width: 20px; text-align: center; font-weight: bold; }
@@ -266,7 +266,7 @@
             document.getElementById('use-local-lut-checkbox').checked = STATE.useLocalLUT;
             document.getElementById('concurrency-slider').value = STATE.concurrency;
             document.getElementById('concurrency-value').textContent = STATE.concurrency;
-            document.getElementById('rps-value').textContent = ENABLE_RPS_CALCULATING ? STATE.rps : '未统计';
+            document.getElementById('rps-value').textContent = ENABLE_RPS_CALCULATING ? STATE.rps : '禁用';
 
             this.courseListEl.innerHTML = '';
             STATE.courses.forEach((course, index) => {
