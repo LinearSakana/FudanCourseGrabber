@@ -1,7 +1,7 @@
 ﻿// ==UserScript==
 // @name         复旦抢课助手 (2025.12)
 // @namespace    http://tampermonkey.net/
-// @version      0.1
+// @version      0.2
 // @description  简易的 Tampermonkey 脚本，用于复旦大学本科生抢课；支持并发，验证码识别，批量导入
 // @author       Gemini & Deepseek & github.com/LinearSakana
 // @match        *://xk.fudan.edu.cn/*
