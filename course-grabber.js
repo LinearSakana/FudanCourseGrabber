@@ -20,6 +20,7 @@
     'use strict';
 
     // --- 全局配置 ---
+    const NEGLECT_CAPTCHA_VERIFICATION_RESPONSE = true;  // 手动设置，决定验证码循环时是否 await 响应结果
     const STATE = {
         courses: [], // 意向课程列表 { lessonAssoc: number, status: 'pending' | 'success' }
         studentId: '',
@@ -744,6 +745,13 @@
                     // console.log(`[验证码 Loop] 滑块距离: ${moveEndX}`);
 
                     const rstImgUrl = `/api/v1/student/course-select/rstImgSwipe?moveEndX=${moveEndX}&wbili=1&studentId=${STATE.studentId}&turnId=${STATE.turnId}`;
+                    if (NEGLECT_CAPTCHA_VERIFICATION_RESPONSE) {
+                        this.makeRequest('GET', rstImgUrl, STATE.headers).catch(error => {
+                            console.error(`[验证码 Loop] 错误: ${error.message}`);
+                        });
+                        captchaLoop();
+                        return;
+                    }
                     const rstResponse = await this.makeRequest('GET', rstImgUrl, STATE.headers);
                     const rstData = JSON.parse(rstResponse.responseText).data;
 
