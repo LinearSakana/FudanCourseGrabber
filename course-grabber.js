@@ -104,7 +104,7 @@
                     log(\`预选成功, Predicate: \${predicateData}\`);
 
                     const predicateResUrl = \`/api/v1/student/course-select/predicate-response/\${studentId}/\${predicateData}\`;
-                    request({ method: 'GET', url: predicateResUrl });
+                    request({ method: 'GET', url: predicateResUrl }); // 忽略 request 返回值，提升循环效率
 
                     // 发送最终添加请求 (add-request) 
                     const addReqUrl = '/api/v1/student/course-select/add-request';
