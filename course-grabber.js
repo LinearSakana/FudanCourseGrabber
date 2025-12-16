@@ -712,21 +712,24 @@
                     const {imgIndex, posIndex} = randomImgParsed.data;
                     console.log(`[验证码 Loop] 获取到验证码参数: imgIndex=${imgIndex}, posIndex=${posIndex}`);
 
-                    // 跨域获取验证码图片
-                    const cdnUrl = `https://cdn-fudan.demo.supwisdom.com/verify/static/verify-image/${imgIndex}/${posIndex}/verify-image.json`;
-                    const cdnHeaders = {
-                        ...STATE.headers,
-                        'Host': 'cdn-fudan.demo.supwisdom.com',
-                        'Origin': 'https://xk.fudan.edu.cn',
-                        'Referer': 'https://xk.fudan.edu.cn/',
-                        'Sec-Fetch-Site': 'cross-site'
-                    };
-
-                    const cdnResponse = await this.makeRequest('GET', cdnUrl, cdnHeaders);
-                    const imgParsed = JSON.parse(JSON.parse(cdnResponse.responseText).data);
-
-                    const moveEndX = await CaptchaSolver.calculate(imgParsed.SrcImage, imgParsed.CutImage);
-                    console.log(`[验证码 Loop] 滑块距离: ${moveEndX}`);
+                    let moveEndX;
+                    if (STATE.useLocalLUT/* && this.captchaMap.get(imgIndex).has(posIndex)*/) {
+                        moveEndX = this.captchaMap.get(imgIndex).get(posIndex);
+                    } else {
+                        // 跨域获取验证码图片
+                        const cdnUrl = `https://cdn-fudan.demo.supwisdom.com/verify/static/verify-image/${imgIndex}/${posIndex}/verify-image.json`;
+                        const cdnHeaders = {
+                            ...STATE.headers,
+                            'Host': 'cdn-fudan.demo.supwisdom.com',
+                            'Origin': 'https://xk.fudan.edu.cn',
+                            'Referer': 'https://xk.fudan.edu.cn/',
+                            'Sec-Fetch-Site': 'cross-site'
+                        };
+                        const cdnResponse = await this.makeRequest('GET', cdnUrl, cdnHeaders);
+                        const imgParsed = JSON.parse(JSON.parse(cdnResponse.responseText).data);
+                        moveEndX = await CaptchaSolver.calculate(imgParsed.SrcImage, imgParsed.CutImage);
+                    }
+                    // console.log(`[验证码 Loop] 滑块距离: ${moveEndX}`);
 
                     const rstImgUrl = `/api/v1/student/course-select/rstImgSwipe?moveEndX=${moveEndX}&wbili=1&studentId=${STATE.studentId}&turnId=${STATE.turnId}`;
                     const rstResponse = await this.makeRequest('GET', rstImgUrl, STATE.headers);
