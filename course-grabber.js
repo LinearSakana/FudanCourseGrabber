@@ -594,7 +594,7 @@
                             input.remove();
                         }
                     });
-                    alert("接下来请选中全部的的 6 个 imgIndex.json 文件");
+                    alert("接下来请选中全部的 6 个 imgIndex.json 文件");
                     input.click();
                 } catch (err) {
                     reject(new Error(`初始化失败 - ${err.message}`));
