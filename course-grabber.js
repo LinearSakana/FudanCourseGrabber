@@ -38,6 +38,15 @@
         rps: 0,
         rpsIntervalId: null, // setInterval 的 ID
     };
+    // 验证码的 imgIndex 只有下面六种可能
+    const LIST_OF_IMGINDEX = [
+        "3ab5eec0-fbb6-4c3f-bfcc-0ce693077db3",
+        "393c5000-304d-4d2d-9ce1-3db6345e0a6b",
+        "3437e4cb-a995-4fae-aeea-14174abc0d6a",
+        "60176ec4-7482-4763-876a-431eceefe779",
+        "c6e7c8e9-b681-4dc2-8d61-e45588f8c7fa",
+        "c9f5d967-9c4b-43fe-b2eb-dc0a2ef01ed7"
+    ];
 
     // --- Web Worker 代码 ---
     const workerCode = `
