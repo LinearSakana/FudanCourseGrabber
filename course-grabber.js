@@ -399,13 +399,13 @@
             const savedState = GM_getValue('grabber_state');
             if (savedState) {
                 const parsed = JSON.parse(savedState);
-                STATE.courses = parsed.courses || [];
-                STATE.studentId = parsed.studentId || '';
-                STATE.turnId = parsed.turnId || '';
-                STATE.headers = parsed.headers || {};
-                STATE.skipCaptcha = parsed.skipCaptcha || false;
-                STATE.useLocalLUT = parsed.useLocalLUT || true;
-                STATE.concurrency = parsed.concurrency || 5;
+                STATE.courses = parsed.courses ?? [];
+                STATE.studentId = parsed.studentId ?? '';
+                STATE.turnId = parsed.turnId ?? '';
+                STATE.headers = parsed.headers ?? {};
+                STATE.skipCaptcha = parsed.skipCaptcha ?? false;
+                STATE.useLocalLUT = parsed.useLocalLUT ?? true;
+                STATE.concurrency = parsed.concurrency ?? 5;
             }
         }
     };
