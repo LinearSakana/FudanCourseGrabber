@@ -20,7 +20,6 @@
     'use strict';
 
     // --- 全局配置 ---
-
     const STATE = {
         courses: [], // 意向课程列表 { lessonAssoc: number, status: 'pending' | 'success' }
         studentId: '',
@@ -28,6 +27,7 @@
         headers: {}, // 从原始请求中捕获的全局 HTTP 头
         isGrabbing: false,
         skipCaptcha: false, // 是否跳过验证码
+        useLocalLUT: true,
         isImporting: false,
         concurrency: 2, // 每门课并发实例数量
         activeWorkers: new Map(), // 存储活跃的 Worker 实例，键为唯一 ID ，值为 Worker 对象
@@ -81,9 +81,9 @@
         async function grabCourse() {
             while (true) { 
                 try {
-                    log('开始新一轮抢课尝试...');
+                    // log('开始新一轮抢课尝试...');
                     
-                    log('发送预选请求: ');
+                    // log('发送预选请求: ');
                     const predicateUrl = '/api/v1/student/course-select/add-predicate';
                     const predicatePayload = {
                         studentAssoc: parseInt(studentId, 10),
@@ -98,53 +98,44 @@
                         data: JSON.stringify(predicatePayload)
                     });
                     const predicateParsed = JSON.parse(predicateRes.responseText);
-                    if (predicateParsed.result !== 0 || !predicateParsed.data) throw new Error(\`预选失败: \${predicateParsed.message || '无有效数据'}\`);
+                    if (predicateParsed.result !== 0 || !predicateParsed.data) continue;
                     const predicateData = predicateParsed.data;
                     log(\`预选成功, Predicate: \${predicateData}\`);
 
                     const predicateResUrl = \`/api/v1/student/course-select/predicate-response/\${studentId}/\${predicateData}\`;
-                    const finalRes = await request({ method: 'GET', url: predicateResUrl });
-                    const finalParsed = JSON.parse(finalRes.responseText);
+                    request({ method: 'GET', url: predicateResUrl });
 
-                    if (finalParsed.result === 0 && finalParsed.data && finalParsed.data.success && finalParsed.data.result[lessonAssoc] === null) {
-                        log('预选结果: 课程可选！进入最终确认阶段...');
+                    // 发送最终添加请求 (add-request) 
+                    const addReqUrl = '/api/v1/student/course-select/add-request';
+                    const addReqPayload = {
+                        studentAssoc: parseInt(studentId, 10),
+                        courseSelectTurnAssoc: parseInt(turnId, 10),
+                        requestMiddleDtos: [{ lessonAssoc: lessonAssoc, virtualCost: null }],
+                        coursePackAssoc: null
+                    };
+                    const addReqRes = await request({
+                        method: 'POST',
+                        url: addReqUrl,
+                        headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+                        data: JSON.stringify(addReqPayload)
+                    });
+                    const addReqParsed = JSON.parse(addReqRes.responseText);
+                    if (addReqParsed.result !== 0 || !addReqParsed.data) continue;
+                    const addReqData = addReqParsed.data;
 
-                        // 发送最终添加请求 (add-request) 
-                        const addReqUrl = '/api/v1/student/course-select/add-request';
-                        const addReqPayload = {
-                            studentAssoc: parseInt(studentId, 10),
-                            courseSelectTurnAssoc: parseInt(turnId, 10),
-                            requestMiddleDtos: [{ lessonAssoc: lessonAssoc, virtualCost: null }],
-                            coursePackAssoc: null
-                        };
-                        const addReqRes = await request({
-                            method: 'POST',
-                            url: addReqUrl,
-                            headers: { 'Content-Type': 'application/json;charset=UTF-8' },
-                            data: JSON.stringify(addReqPayload)
-                        });
-                        const addReqParsed = JSON.parse(addReqRes.responseText);
-                        if (addReqParsed.result !== 0 || !addReqParsed.data) throw new Error(\`最终添加请求失败: \${addReqParsed.message || '无有效数据'}\`);
-                        const addReqData = addReqParsed.data;
+                    const addDropUrl = \`/api/v1/student/course-select/add-drop-response/\${studentId}/\${addReqData}\`;
+                    const addDropRes = await request({ method: 'GET', url: addDropUrl });
+                    const addDropParsed = JSON.parse(addDropRes.responseText);
 
-                        const addDropUrl = \`/api/v1/student/course-select/add-drop-response/\${studentId}/\${addReqData}\`;
-                        const addDropRes = await request({ method: 'GET', url: addDropUrl });
-                        const addDropParsed = JSON.parse(addDropRes.responseText);
-
-                        if (addDropParsed.data && addDropParsed.data.success) {
-                            postMessage({ type: 'success', lessonAssoc: lessonAssoc });
-                            self.close();
-                            return; // 退出循环
-                        } else {
-                            throw new Error(\`最终确认失败: \${addDropParsed.message || '未知错误'}\`);
-                        }
+                    if (addDropParsed.data && addDropParsed.data.success) {
+                        postMessage({ type: 'success', lessonAssoc: lessonAssoc });
+                        self.close();
+                        return; // 退出循环
                     } else {
-                        const errorMessage = finalParsed.data && finalParsed.data.result[lessonAssoc] ? finalParsed.data.result[lessonAssoc] : '课程不可选或响应格式错误';
-                        throw new Error(\`预选检查失败: \${errorMessage}\`);
+                        throw new Error(\`最终确认失败: \${addDropParsed.message || '未知错误'}\`);
                     }
-
                 } catch (error) {
-                    log(\`发生错误: \${error.message}\`);
+                    log(\`错误: \${error.message}\`);
                 }
             }
         }
@@ -159,7 +150,7 @@
                 headers = data.headers;
                 grabCourse();
             } else if (type === 'stop') {
-                log('Worker已被主线程终止 ');
+                // log('Worker已被主线程终止 ');
                 self.close();
             }
         };
@@ -183,7 +174,9 @@
                     </div>
                     <div class="grabber-input-group">
                         <input type="checkbox" id="skip-captcha-checkbox">
-                        <label for="skip-captcha-checkbox">跳过图形验证</label>
+                        <label for="skip-captcha-checkbox">跳过验证</label>
+                        <input type="checkbox" id="use-local-lut-checkbox">
+                        <label for="use-local-lut-checkbox">导入本地 Captcha</br>查找表（.json）</label>
                     </div>
                     <div class="grabber-slider-group">
                         <label for="concurrency-slider">并发数:</label>
@@ -268,6 +261,7 @@
         render() {
             document.getElementById('student-id-input').value = STATE.studentId;
             document.getElementById('skip-captcha-checkbox').checked = STATE.skipCaptcha;
+            document.getElementById('use-local-lut-checkbox').checked = STATE.useLocalLUT;
             document.getElementById('concurrency-slider').value = STATE.concurrency;
             document.getElementById('concurrency-value').textContent = STATE.concurrency;
             document.getElementById('rps-value').textContent = STATE.rps;
@@ -340,6 +334,10 @@
                     }
                 }
             });
+            document.getElementById('use-local-lut-checkbox').addEventListener('change', (e) => {
+                STATE.useLocalLUT = e.target.checked;
+                Persistence.save();
+            });
 
             document.getElementById('concurrency-slider').addEventListener('input', (e) => {
                 STATE.concurrency = parseInt(e.target.value, 10);
@@ -391,6 +389,7 @@
                 turnId: STATE.turnId,
                 headers: STATE.headers,
                 skipCaptcha: STATE.skipCaptcha,
+                useLocalLUT: STATE.useLocalLUT,
                 concurrency: STATE.concurrency,
             };
             GM_setValue('grabber_state', JSON.stringify(dataToSave));
@@ -404,6 +403,7 @@
                 STATE.turnId = parsed.turnId || '';
                 STATE.headers = parsed.headers || {};
                 STATE.skipCaptcha = parsed.skipCaptcha || false;
+                STATE.useLocalLUT = parsed.useLocalLUT || true;
                 STATE.concurrency = parsed.concurrency || 5;
             }
         }
@@ -720,7 +720,7 @@
                     }
 
                     const {imgIndex, posIndex} = randomImgParsed.data;
-                    console.log(`[验证码 Loop] 获取到验证码参数: imgIndex=${imgIndex}, posIndex=${posIndex}`);
+                    // console.log(`[验证码 Loop] 获取到验证码参数: imgIndex=${imgIndex}, posIndex=${posIndex}`);
 
                     let moveEndX;
                     if (STATE.useLocalLUT/* && this.captchaMap.get(imgIndex).has(posIndex)*/) {
@@ -746,7 +746,7 @@
                     const rstData = JSON.parse(rstResponse.responseText).data;
 
                     if (rstData && rstData.success) {
-                        console.log('[验证码 Loop] 滑块验证成功！');
+                        // console.log('[验证码 Loop] 滑块验证成功！');
                         captchaLoop();
                     } else {
                         throw new Error('滑块验证失败');
