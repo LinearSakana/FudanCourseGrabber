@@ -27,7 +27,7 @@
         headers: {}, // 从原始请求中捕获的全局 HTTP 头
         isGrabbing: false,
         skipCaptcha: false, // 是否跳过验证码
-        useLocalLUT: true,
+        useLocalLUT: true,  // 是否使用本地 LUT
         isImporting: false,
         concurrency: 2, // 每门课并发实例数量
         activeWorkers: new Map(), // 存储活跃的 Worker 实例，键为唯一 ID ，值为 Worker 对象
