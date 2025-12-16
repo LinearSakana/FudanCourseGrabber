@@ -93,13 +93,13 @@
                         requestMiddleDtos: [{ lessonAssoc: lessonAssoc, virtualCost: 0 }],
                         coursePackAssoc: null
                     };
-                    const predicateRes = await request({
-                        method: 'POST',
-                        url: predicateUrl,
-                        headers: { 'Content-Type': 'application/json;charset=UTF-8' },
-                        data: JSON.stringify(predicatePayload)
-                    });
-                    const predicateParsed = JSON.parse(predicateRes.responseText);
+                    const predicateParsed = 
+                        JSON.parse((await request({
+                            method: 'POST',
+                            url: predicateUrl,
+                            headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+                            data: JSON.stringify(predicatePayload)
+                        })).responseText);
                     if (predicateParsed.result !== 0 || !predicateParsed.data) continue;
                     const predicateData = predicateParsed.data;
                     log(\`预选成功, Predicate: \${predicateData}\`);
@@ -115,19 +115,19 @@
                         requestMiddleDtos: [{ lessonAssoc: lessonAssoc, virtualCost: null }],
                         coursePackAssoc: null
                     };
-                    const addReqRes = await request({
-                        method: 'POST',
-                        url: addReqUrl,
-                        headers: { 'Content-Type': 'application/json;charset=UTF-8' },
-                        data: JSON.stringify(addReqPayload)
-                    });
-                    const addReqParsed = JSON.parse(addReqRes.responseText);
+                    const addReqParsed = 
+                        JSON.parse((await request({
+                            method: 'POST',
+                            url: addReqUrl,
+                            headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+                            data: JSON.stringify(addReqPayload)
+                        })).responseText);
                     if (addReqParsed.result !== 0 || !addReqParsed.data) continue;
                     const addReqData = addReqParsed.data;
 
                     const addDropUrl = \`/api/v1/student/course-select/add-drop-response/\${studentId}/\${addReqData}\`;
-                    const addDropRes = await request({ method: 'GET', url: addDropUrl });
-                    const addDropParsed = JSON.parse(addDropRes.responseText);
+                    const addDropParsed = 
+                        JSON.parse((await request({ method: 'GET', url: addDropUrl })).responseText);
 
                     if (addDropParsed.data && addDropParsed.data.success) {
                         postMessage({ type: 'success', lessonAssoc: lessonAssoc });
@@ -314,8 +314,7 @@
                 const target = e.target.closest('button');
                 if (!target) return;
                 const index = parseInt(target.dataset.index, 10);
-                const action = target.dataset.action;
-                if (action === 'delete') {
+                if (target.dataset.action === 'delete') {
                     STATE.courses.splice(index, 1);
                     Persistence.save();
                     this.render();
@@ -447,9 +446,8 @@
                 else if (STATE.isImporting && url.pathname.includes('/api/v1/student/course-select/std-count')) {
                     const lessonIdsParam = url.searchParams.get('lessonIds');
                     if (lessonIdsParam) {
-                        const lessonIds = lessonIdsParam.split(',');
                         let newCoursesCount = 0;
-                        lessonIds.forEach(idStr => {
+                        lessonIdsParam.split(',').forEach(idStr => {
                             const lessonAssoc = parseInt(idStr, 10);
                             if (!isNaN(lessonAssoc) && !STATE.courses.some(c => c.lessonAssoc === lessonAssoc)) {
                                 STATE.courses.push({lessonAssoc, status: 'pending'});
@@ -635,13 +633,12 @@
             if (ENABLE_RPS_CALCULATING) {
                 STATE.rpsIntervalId = setInterval(this.calculateRPS.bind(this), 1000); // 每1000ms更新一次RPS
             }
-            const workerBlob = new Blob([workerCode], {type: 'application/javascript'});
-            const workerUrl = URL.createObjectURL(workerBlob);
 
             for (const course of STATE.courses) {
                 for (let i = 0; i < STATE.concurrency; i++) { // 使用状态中的并发数
                     const workerId = `${course.lessonAssoc}-${i}`;
-                    const worker = new Worker(workerUrl);
+                    const worker =
+                        new Worker(URL.createObjectURL(new Blob([workerCode], {type: 'application/javascript'})));
                     worker.onmessage = (event) => {
                         const {type, requestId, details, message} = event.data;
                         if (type === 'gm_request') {
@@ -718,8 +715,8 @@
                     console.log('[验证码 Loop] 开始新一轮验证码验证...');
 
                     const randomImgUrl = `/api/v1/student/course-select/getRandomImg?studentId=${STATE.studentId}&turnId=${STATE.turnId}`;
-                    const randomImgResponse = await this.makeRequest('GET', randomImgUrl, STATE.headers);
-                    const randomImgParsed = JSON.parse(randomImgResponse.responseText);
+                    const randomImgParsed =
+                        JSON.parse((await this.makeRequest('GET', randomImgUrl, STATE.headers)).responseText);
                     if (randomImgParsed.result !== 0 || !randomImgParsed.data) {
                         throw new Error(`获取随机验证码失败: ${randomImgParsed.message || '无有效数据'}`);
                     }
@@ -740,8 +737,8 @@
                             'Referer': 'https://xk.fudan.edu.cn/',
                             'Sec-Fetch-Site': 'cross-site'
                         };
-                        const cdnResponse = await this.makeRequest('GET', cdnUrl, cdnHeaders);
-                        const imgParsed = JSON.parse(JSON.parse(cdnResponse.responseText).data);
+                        const imgParsed =
+                            JSON.parse(JSON.parse((await this.makeRequest('GET', cdnUrl, cdnHeaders)).responseText).data);
                         moveEndX = await CaptchaSolver.calculate(imgParsed.SrcImage, imgParsed.CutImage);
                     }
                     // console.log(`[验证码 Loop] 滑块距离: ${moveEndX}`);
@@ -754,8 +751,8 @@
                         captchaLoop();
                         return;
                     }
-                    const rstResponse = await this.makeRequest('GET', rstImgUrl, STATE.headers);
-                    const rstData = JSON.parse(rstResponse.responseText).data;
+                    const rstData =
+                        JSON.parse((await this.makeRequest('GET', rstImgUrl, STATE.headers)).responseText).data;
 
                     if (rstData && rstData.success) {
                         // console.log('[验证码 Loop] 滑块验证成功！');
