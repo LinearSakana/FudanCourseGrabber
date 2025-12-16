@@ -9,28 +9,33 @@
 ## ✨ 特性
 
 ### 🔥 核心功能
-- **多线程并发抢课** - 每门课程可配置多个并发实例（1-10个）
-- **智能验证码破解** - 集成 OpenCV.js 自动识别滑块验证码
-- **实时性能监控** - 动态显示请求速率 (RPS)
+
+- **多线程并发** - 可启动多个 Web Worker 并发实例（1-10个）
+- **验证码识别** - 集成 OpenCV.js 自动识别滑块验证码
 - **课程批量管理** - 支持从页面自动导入和手动管理意向课程
 
-### 🛡️ 安全可靠
-- **资源自动回收** - 抢课成功后立即释放相关线程
-- **状态持久化** - 自动保存配置和课程列表
-
 ### 🎯 智能优化
-- **验证码预加载** - 后台持续保持有效验证会话
-- **动态状态更新** - 实时显示每门课程的抢课状态
+
+- **实时状态更新** - 显示每门课程的抢课状态、请求速率 (RPS)
+- **Captcha Lookup Tables** - 预先存储 posIndex 和 moveEndX 映射，通过查表实现快速验证
+
+> ⚠ **注意**
+>
+> 出于安全考量，本仓库根目录下 /captchaRecords 不会存储完整的验证码记录，仅有一个以 imgIndex 命名，储存 posIndex 与
+> moveEndX 键值对的示例文件。如需进行验证码查表，您可能要自行配置
 
 ## 🚀 快速开始
 
 ### 1. 安装 Tampermonkey
+
 在浏览器中安装 [Tampermonkey](https://tampermonkey.net/) 扩展，并点击“添加新脚本”
 
 ### 2. 安装脚本
+
 复制 [这里](https://raw.githubusercontent.com/LinearSakana/FudanCourseGrabber/main/course-grabber.js) 的内容到新脚本中
 
 ### 3. 配置使用
+
 1. 打开 xk.fudan.edu.cn
 2. 页面右上角将出现控制面板
 3. **首次使用**：在网页上进行一次手动选课操作，脚本会自动捕获必要参数
@@ -40,6 +45,7 @@
 ## 📖 使用说明
 
 ### 控制面板功能
+
 - **StudentID**：自动从请求中捕获的学生ID
 - **跳过图形验证**：启用后可绕过验证码流程（请根据实际情况确定是否需要验证码）
 - **并发数调节**：控制每门课程的并行请求数量
@@ -47,6 +53,7 @@
 - **课程列表**：显示所有意向课程及其抢课状态
 
 ### 验证码原理
+
 ```javascript
 // 使用 OpenCV.js 进行图像处理
 cv.cvtColor(bgMat, bgGray, cv.COLOR_RGBA2GRAY);
@@ -55,19 +62,11 @@ cv.matchTemplate(bgEdges, sliderEdges, result, cv.TM_CCOEFF_NORMED);
 return cv.minMaxLoc(result).maxLoc.x;
 ```
 
-## 🛠️ 开发
-
 ### 依赖
+
 - Tampermonkey 4.0+
 - OpenCV.js 4.8.0
 
-### 构建
-无需构建，直接使用 Tampermonkey 加载脚本文件
-
-## ⚠️ 注意事项
-
-- **网络环境**：建议使用有线网络，或前往光华楼等网络状况良好的地方
-- **浏览器兼容**：建议使用 Chrome/Edge 最新版本
 
 ---
 
