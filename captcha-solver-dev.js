@@ -2,7 +2,7 @@
 // @name         复旦抢课助手Dev
 // @namespace    http://tampermonkey.net/
 // @version      0.1
-// @description  简易的 Tampermonkey 脚本，用于复旦大学本科生抢课；支持并发，验证码识别，批量导入
+// @description  用于录入已识别的验证码数据，并打包下载
 // @author       Gemini & Deepseek & github.com/LinearSakana
 // @match        *://xk.fudan.edu.cn/*
 // @icon         https://id.fudan.edu.cn/ac/favicon.ico
@@ -467,8 +467,8 @@
                         const imgParsed = JSON.parse(JSON.parse(cdnResponse.responseText).data);
 
                         moveEndX = await CaptchaSolver.calculate(imgParsed.SrcImage, imgParsed.CutImage);
+                        console.log(`[验证码 Loop] 滑块距离: ${moveEndX}`);
                     }
-                    console.log(`[验证码 Loop] 滑块距离: ${moveEndX}`);
 
                     const rstImgUrl = `/api/v1/student/course-select/rstImgSwipe?moveEndX=${moveEndX}&wbili=1&studentId=${STATE.studentId}&turnId=${STATE.turnId}`;
                     const rstResponse = await this.makeRequest('GET', rstImgUrl, STATE.headers);
