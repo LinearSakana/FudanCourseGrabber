@@ -818,9 +818,8 @@
         },
 
         calculateRPS() {
-            const now = Date.now();
-            STATE.reqTimestamps = STATE.reqTimestamps.filter(timestamp => (now - timestamp) < 1000);
-            STATE.rps = STATE.reqTimestamps.length;
+            STATE.rps =
+                STATE.reqTimestamps.filter(timestamp => (Date.now() - timestamp) < 1000).length;
             UI.render();
         }
     };
